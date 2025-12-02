@@ -1,4 +1,5 @@
 import argparse
+import pickle
 
 import torch
 from torch import optim
@@ -17,6 +18,8 @@ parser.add_argument('mode', choices=['vanilla', 'single_ffwd'])
 args = parser.parse_args()
 
 SINGLE_FFWD = args.mode == 'single_ffwd'
+LOSS_FILE = 'single_ffwd_loss.bin' if SINGLE_FFWD else 'vanilla_loss.bin'
+MODEL_FILE = 'single_ffwd_model.pt' if SINGLE_FFWD else 'vanilla_model.pt'
 
 # CONTEXT_LENGTH = 256
 # D_MODEL = 384
@@ -32,7 +35,7 @@ N_LAYERS = 6
 DROPOUT = 0.2
 
 BATCH_SIZE = 1024
-LR = 3e-4
+LR = 1e-3
 
 with open('shakespeare.txt', 'r') as file:
     train_tokens = file.read()
@@ -87,6 +90,8 @@ print(f'{other_params=}')
 print(f'{total=}')
 print(f'{total_ffwd_att=}')
 
+print(f'DEVICE: {device}')
+
 model.to(device)
 
 optimizer = optim.Adam(model.parameters(), lr=LR)
@@ -130,15 +135,19 @@ if __name__ == '__main__':
         loss.backward()
         optimizer.step()
 
-        train_loss_values.append(loss.item())
+        train_loss_values.append((i, loss.item()))
 
         # print(loss.item())
 
         if i % 10 == 0:
             test_loss = get_test_loss()
-            test_loss_values.append(test_loss)
+            test_loss_values.append((i, test_loss))
 
             print(i)
             print(f'test loss: {test_loss}')
             print(f'train loss: {loss.item()}')
 
+            with open(LOSS_FILE, 'wb') as f:
+                pickle.dump((train_loss_values, test_loss_values), f)
+
+            torch.save(model.state_dict(), MODEL_FILE)
