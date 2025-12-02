@@ -17,7 +17,8 @@ class Layer(nn.Module):
         super().__init__()
 
         self.attention = nn.MultiheadAttention(d_model, n_heads, dropout=dropout, batch_first=True)
-        self.register_buffer('mask', torch.triu(torch.ones((context_length, context_length)), diagonal=1))
+        self.register_buffer('mask', torch.triu(torch.ones((context_length, context_length), dtype=torch.bool), diagonal=1))
+        print(self.mask)
         self.ffwd = ffwd if ffwd is not None else FFWD(d_model)
 
         self.attn_layernorm = nn.LayerNorm(d_model)
