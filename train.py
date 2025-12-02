@@ -4,7 +4,6 @@ import torch
 from torch import optim
 
 from transformer import Transformer
-from old_model import Model
 
 torch.manual_seed(1337)
 torch.set_float32_matmul_precision('high')
@@ -26,13 +25,13 @@ SINGLE_FFWD = args.mode == 'single_ffwd'
 # DROPOUT = 0.2
 
 
-CONTEXT_LENGTH = 512
-D_MODEL = 32
+CONTEXT_LENGTH = 256
+D_MODEL = 64
 N_HEADS = 4
 N_LAYERS = 6
 DROPOUT = 0.2
 
-BATCH_SIZE = 1000
+BATCH_SIZE = 1024
 LR = 3e-4
 
 with open('shakespeare.txt', 'r') as file:
@@ -92,10 +91,31 @@ model.to(device)
 
 optimizer = optim.Adam(model.parameters(), lr=LR)
 
-loss_values = []
+@torch.no_grad
+def get_test_loss():
+    model.eval()
+
+    n_loss = 3
+    loss_values = torch.zeros((n_loss,))
+
+    for i in range(n_loss):
+        indices = torch.randint(0, len(test_tokens) - CONTEXT_LENGTH, (BATCH_SIZE, 1)).repeat(1, CONTEXT_LENGTH) + torch.arange(CONTEXT_LENGTH)
+
+        test_x = test_tokens[indices].to(device)
+        test_y = test_tokens[indices+1].to(device)
+
+        _, loss = model(test_x, test_y)
+
+        loss_values[i] = loss
+
+    model.train()
+    return loss_values.mean()
+
+train_loss_values = []
+test_loss_values = []
 
 if __name__ == '__main__':
-    for i in range(1000):
+    for i in range(10_000):
 
         indices = torch.randint(0, len(train_tokens) - CONTEXT_LENGTH, (BATCH_SIZE, 1)).repeat(1, CONTEXT_LENGTH) + torch.arange(CONTEXT_LENGTH)
 
@@ -110,11 +130,15 @@ if __name__ == '__main__':
         loss.backward()
         optimizer.step()
 
-        loss_values.append(loss.item())
+        train_loss_values.append(loss.item())
 
-        print(loss.item())
+        # print(loss.item())
 
-        # if i % 10 == 0:
-        #     print(loss.item())
-        #     # print(model.generate(tokens[:CONTEXT_LENGTH], 200))
+        if i % 10 == 0:
+            test_loss = get_test_loss()
+            test_loss_values.append(test_loss)
+
+            print(i)
+            print(f'test loss: {test_loss}')
+            print(f'train loss: {loss.item()}')
 
